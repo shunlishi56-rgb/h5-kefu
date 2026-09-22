@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>客服系统 - 登录</title>
+<style>
+:root{--blue:#2b7de9;--blue-deep:#1f5fc0;--bg:#f2f7fd;--line:#e3ecf6;--txt:#243447;--txt2:#8296ad}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  background:linear-gradient(160deg,#eaf3fd 0%,#f7fbff 55%,#eef6fd 100%);min-height:100vh;
+  display:flex;align-items:center;justify-content:center;color:var(--txt);padding:20px}
+.card{background:#fff;border:1px solid var(--line);border-radius:18px;padding:36px 32px;
+  width:100%;max-width:380px;box-shadow:0 12px 40px rgba(31,95,192,.08)}
+.logo{width:52px;height:52px;border-radius:14px;background:linear-gradient(135deg,#4c9bf5,#2b7de9);
+  display:flex;align-items:center;justify-content:center;margin:0 auto 14px}
+.logo svg{width:28px;height:28px;color:#fff}
+h1{font-size:20px;text-align:center;margin-bottom:4px}
+.sub{font-size:13px;color:var(--txt2);text-align:center;margin-bottom:26px}
+label{display:block;font-size:13px;color:var(--txt);margin:14px 0 6px}
+input{width:100%;height:44px;border:1px solid var(--line);border-radius:10px;padding:0 12px;
+  font-size:15px;outline:none;background:#fbfdff;font-family:inherit}
+input:focus{border-color:var(--blue);background:#fff}
+button{width:100%;height:46px;margin-top:24px;border:none;border-radius:10px;background:var(--blue);
+  color:#fff;font-size:16px;cursor:pointer;font-family:inherit}
+button:active{background:var(--blue-deep)}
+button:disabled{opacity:.6;cursor:not-allowed}
+.err{color:#e05c5c;font-size:13px;min-height:18px;margin-top:12px;text-align:center}
+.tip{margin-top:18px;font-size:12px;color:var(--txt2);text-align:center;line-height:1.6;
+  border-top:1px dashed var(--line);padding-top:14px}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8z"/>
+    </svg>
+  </div>
+  <h1>在线客服系统</h1>
+  <div class="sub">客服工作台登录</div>
+  <label>登录账号</label>
+  <input id="u" autocomplete="username" placeholder="请输入账号">
+  <label>密码</label>
+  <input id="p" type="password" autocomplete="current-password" placeholder="请输入密码">
+  <div class="err" id="err"></div>
+  <button id="btn">登 录</button>
+  <div class="tip">访客无需登录<br>访客通过客服专属链接 / 二维码直接进入会话</div>
+</div>
+<script>
+'use strict';
+const $ = s => document.querySelector(s);
+async function login() {
+  const username = $('#u').value.trim(), password = $('#p').value;
+  if (!username || !password) { $('#err').textContent = '请输入账号和密码'; return; }
+  $('#btn').disabled = true; $('#err').textContent = '';
+  try {
+    const r = await fetch('/api/login', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
+    });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || '登录失败');
+    localStorage.setItem('h5kefu_token', j.token);
+    location.href = '/workspace';
+  } catch (e) {
+    $('#err').textContent = e.message || '登录失败';
+  } finally {
+    $('#btn').disabled = false;
+  }
+}
+$('#btn').onclick = login;
+$('#p').addEventListener('keydown', e => { if (e.key === 'Enter') login(); });
+$('#u').addEventListener('keydown', e => { if (e.key === 'Enter') $('#p').focus(); });
+</script>
+</body>
+</html>

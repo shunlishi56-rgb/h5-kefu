@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="format-detection" content="telephone=no">
+<title>在线客服</title>
+<style>
+:root{
+  --blue:#2b7de9; --blue-deep:#1f5fc0; --bg:#f2f7fd; --line:#e3ecf6;
+  --txt:#243447; --txt2:#8296ad; --bubble-visitor:#2b7de9; --bubble-agent:#ffffff;
+  --radius:14px; --safe-b:env(safe-area-inset-bottom,0px);
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  background:var(--bg);color:var(--txt);overflow:hidden;display:flex;flex-direction:column}
+/* ---------- 顶栏 ---------- */
+#top{display:flex;align-items:center;gap:10px;padding:10px 14px;background:#fff;
+  border-bottom:1px solid var(--line);position:sticky;top:0;z-index:9}
+#avatar{width:42px;height:42px;border-radius:50%;background:linear-gradient(135deg,#4c9bf5,#2b7de9);
+  color:#fff;display:flex;align-items:center;justify-content:center;font-size:18px;flex:none;font-weight:600}
+#top .info{flex:1;min-width:0}
+#agentName{font-size:16px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#agentStatus{font-size:12px;color:var(--txt2);display:flex;align-items:center;gap:5px;margin-top:2px}
+.dot{width:7px;height:7px;border-radius:50%;background:#bbb;flex:none}
+.dot.on{background:#2ec06e;box-shadow:0 0 0 3px rgba(46,192,110,.15)}
+/* ---------- 离线提示条 ---------- */
+#offlineTip{display:none;background:#fdf6ec;color:#b07a2a;font-size:12.5px;padding:7px 14px;
+  border-bottom:1px solid #f5e9d5;line-height:1.5}
+#offlineTip.show{display:block}
+/* ---------- 消息区 ---------- */
+#msgs{flex:1;overflow-y:auto;padding:14px 12px calc(8px + var(--safe-b));-webkit-overflow-scrolling:touch}
+.time-gap{text-align:center;color:var(--txt2);font-size:11.5px;margin:10px 0 14px}
+.row{display:flex;margin-bottom:14px;align-items:flex-end;gap:8px}
+.row.me{flex-direction:row-reverse}
+.face{width:32px;height:32px;border-radius:8px;flex:none;display:flex;align-items:center;justify-content:center;
+  font-size:14px;color:#fff;margin-bottom:18px}
+.face.agent{background:linear-gradient(135deg,#4c9bf5,#2b7de9)}
+.face.visitor{background:#b9c6d6}
+.row .body{max-width:72%;display:flex;flex-direction:column;gap:4px}
+.row.me .body{align-items:flex-end}
+.bubble{background:var(--bubble-agent);border:1px solid var(--line);padding:9px 12px;border-radius:var(--radius);
+  font-size:15px;line-height:1.55;word-break:break-word;white-space:pre-wrap;box-shadow:0 1px 2px rgba(36,52,71,.04)}
+.row.me .bubble{background:var(--bubble-visitor);color:#fff;border-color:transparent}
+.bubble img{max-width:100%;max-height:240px;border-radius:8px;display:block;cursor:zoom-in}
+.bubble.recalled{background:transparent!important;border:none!important;box-shadow:none;color:var(--txt2);
+  font-size:12.5px;padding:0}
+.meta{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--txt2);padding:0 4px}
+.reads{display:inline-flex;gap:1px;align-items:center}
+.reads svg{width:13px;height:13px}
+.reads.ok svg{color:var(--blue)}
+.recalled-line{text-align:center;color:var(--txt2);font-size:12px;margin:6px 0 14px}
+/* 撤回按钮（桌面 hover） */
+.recall-btn{display:none;border:none;background:#f0f4fa;color:var(--txt2);font-size:11px;
+  padding:3px 8px;border-radius:10px;cursor:pointer;flex:none;margin-bottom:18px}
+@media (hover:hover){
+  .row.mine:not(.was-recalled):hover .recall-btn{display:block}
+  .row.mine:not(.was-recalled):hover .meta{display:none}
+}
+/* ---------- 输入区 ---------- */
+#inputbar{background:#fff;border-top:1px solid var(--line);padding:9px 10px calc(9px + var(--safe-b));
+  display:flex;align-items:flex-end;gap:8px}
+#btnImg{width:38px;height:38px;border-radius:10px;border:1px solid var(--line);background:#fff;
+  display:flex;align-items:center;justify-content:center;cursor:pointer;flex:none}
+#btnImg svg{width:20px;height:20px;color:var(--blue)}
+#txt{flex:1;border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:15px;
+  outline:none;resize:none;max-height:96px;line-height:1.5;background:#fff;font-family:inherit}
+#txt:focus{border-color:var(--blue)}
+#btnSend{border:none;background:var(--blue);color:#fff;border-radius:10px;padding:0 16px;height:38px;
+  font-size:15px;cursor:pointer;flex:none;font-family:inherit}
+#btnSend:active{background:var(--blue-deep)}
+#btnSend:disabled{background:#b3d0f7}
+#typing{height:18px;font-size:12px;color:var(--txt2);padding:0 16px;display:flex;align-items:center}
+#typing .txt{display:none;animation:blink 1.2s infinite}
+#typing.on .txt{display:inline}
+@keyframes blink{50%{opacity:.35}}
+/* ---------- 图片预览 ---------- */
+#viewer{position:fixed;inset:0;background:rgba(10,15,22,.9);z-index:99;display:none;
+  align-items:center;justify-content:center;cursor:zoom-out}
+#viewer.show{display:flex}
+#viewer img{max-width:96vw;max-height:96vh;border-radius:6px}
+/* ---------- 加载/错误 ---------- */
+#connState{position:fixed;top:60px;left:50%;transform:translateX(-50%);background:rgba(36,52,71,.85);
+  color:#fff;font-size:12.5px;padding:6px 16px;border-radius:16px;z-index:50;display:none}
+#connState.show{display:block}
+</style>
+</head>
+<body>
+
+<header id="top">
+  <div id="avatar">客</div>
+  <div class="info">
+    <div id="agentName">在线客服</div>
+    <div id="agentStatus"><span class="dot" id="dot"></span><span id="statusText">连接中…</span></div>
+  </div>
+</header>
+
+<div id="offlineTip">客服当前不在线，您可以先留言，客服上线后会第一时间回复您。</div>
+<div id="connState">正在重新连接…</div>
+
+<main id="msgs"></main>
+
+<div id="typing"><span class="txt">对方正在输入…</span></div>
+
+<footer id="inputbar">
+  <button id="btnImg" title="发送图片" aria-label="发送图片">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.6"/><path d="m21 15-5-5L5 21"/></svg>
+  </button>
+  <textarea id="txt" rows="1" placeholder="请输入消息…"></textarea>
+  <button id="btnSend">发送</button>
+  <input type="file" id="file" accept="image/jpeg,image/png,image/gif,image/webp" hidden>
+</footer>
+
+<div id="viewer"><img id="viewerImg" alt="图片预览"></div>
+
+<script>
+'use strict';
+/* ================= 基础工具 ================= */
+const $ = s => document.querySelector(s);
+const msgsEl = $('#msgs'), txtEl = $('#txt');
+const pathParts = location.pathname.split('/');
+const agentId = pathParts[pathParts.length - 1] || '';
+
+function uuid() {
+  if (crypto.randomUUID) return crypto.randomUUID();
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = Math.random() * 16 | 0;
+    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+  });
+}
+function esc(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fmtTime(ts) {
+  const d = new Date(ts), now = new Date();
+  const hm = String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+  if (d.toDateString() === now.toDateString()) return hm;
+  const yest = new Date(now.getTime() - 864e5);
+  if (d.toDateString() === yest.toDateString()) return '昨天 ' + hm;
+  return (d.getMonth()+1) + '月' + d.getDate() + '日 ' + hm;
+}
+function scrollToBottom(smooth) {
+  msgsEl.scrollTo({ top: msgsEl.scrollHeight, behavior: smooth ? 'smooth' : 'auto' });
+}
+
+/* ================= 访客身份（免登录：本地生成，持久保留） ================= */
+let visitorId = localStorage.getItem('h5kefu_vid');
+let visitorName = localStorage.getItem('h5kefu_vname');
+if (!visitorId) { visitorId = uuid(); localStorage.setItem('h5kefu_vid', visitorId); }
+if (!visitorName) {
+  visitorName = '访客' + Math.random().toString(36).slice(2, 6).toUpperCase();
+  localStorage.setItem('h5kefu_vname', visitorName);
+}
+
+/* ================= 状态 ================= */
+let ws = null;
+let sid = '';
+let maxSeq = 0;            // 本地已知最大消息序号（增量拉取 & 已读上报依据）
+let lastReadSeq = 0;       // 已上报的已读位置
+let agentOnline = false;
+let reconnectDelay = 1000;
+let reconnectTimer = null;
+let helloOk = false;
+const pendingMsgs = new Map();   // cid -> {el, content, msgType}  未 ACK 消息（断线重发）
+const myMsgIds = new Set();      // 自己消息的 DOM 集合（按 cid / id 索引）
+const domById = new Map();       // 消息 id -> 消息 DOM 行
+const domByCid = new Map();      // 消息 cid -> 消息 DOM 行（pending 阶段）
+const renderedSeqs = new Set();  // 已渲染的消息 seq（去重，防 WS 与 HTTP 双通道重复）
+
+/* ================= 渲染 ================= */
+let lastGapTs = 0;
+function renderMsg(m, opts) {
+  opts = opts || {};
+  // 时间间隔 >5 分钟 插入时间行
+  if (!opts.silent && (!lastGapTs || m.ts - lastGapTs > 5 * 60 * 1000)) {
+    const g = document.createElement('div');
+    g.className = 'time-gap'; g.textContent = fmtTime(m.ts);
+    msgsEl.appendChild(g);
+  }
+  lastGapTs = m.ts;
+
+  const mine = m.from === 'visitor';
+  const row = document.createElement('div');
+  row.className = 'row ' + (mine ? 'me mine' : '');
+  row.dataset.id = m.id || '';
+  row.dataset.seq = m.seq || 0;
+  row.dataset.cid = m.cid || '';
+
+  const face = document.createElement('div');
+  face.className = 'face ' + (mine ? 'visitor' : 'agent');
+  face.textContent = mine ? '我' : '客';
+
+  const body = document.createElement('div');
+  body.className = 'body';
+
+  if (m.recalled) {
+    row.classList.add('was-recalled');
+    const b = document.createElement('div');
+    b.className = 'bubble recalled';
+    b.textContent = (mine ? '你' : '对方') + '撤回了一条消息';
+    body.appendChild(b);
+  } else {
+    const b = document.createElement('div');
+    b.className = 'bubble';
+    if (m.type === 'image') {
+      const img = document.createElement('img');
+      img.src = m.content; img.alt = '图片'; img.loading = 'lazy';
+      img.onclick = () => { $('#viewerImg').src = m.content; $('#viewer').classList.add('show'); };
+      b.appendChild(img);
+    } else {
+      b.textContent = m.content;
+    }
+    body.appendChild(b);
+    // 元信息：时间 + 已读状态
+    const meta = document.createElement('div');
+    meta.className = 'meta';
+    meta.innerHTML = '<span class="tm">' + fmtTime(m.ts) + '</span>' + (mine ? '<span class="reads"></span>' : '');
+    body.appendChild(meta);
+    if (mine) updateReads(row, m);
+  }
+
+  // 长按 / hover 撤回（仅自己的消息）
+  if (mine && !m.recalled && m.from === 'visitor') {
+    attachRecall(row, m);
+  }
+
+  row.appendChild(face);
+  row.appendChild(body);
+
+  // 撤回按钮（放在 row 外侧，me 时在左边）
+  if (mine && !m.recalled) {
+    const btn = document.createElement('button');
+    btn.className = 'recall-btn'; btn.textContent = '撤回';
+    btn.onclick = ev => { ev.stopPropagation(); doRecall(m, row); };
+    row.insertBefore(btn, row.firstChild);
+  }
+
+  msgsEl.appendChild(row);
+  if (m.id) domById.set(m.id, row);
+  if (m.cid) domByCid.set(m.cid, row);
+  if (!opts.noScroll) scrollToBottom(!opts.instant);
+  return row;
+}
+
+/** 更新单条消息的已读勾 */
+function updateReads(row, m) {
+  const readsEl = row.querySelector('.reads');
+  if (!readsEl) return;
+  if (!m.seq) { // pending：发送中
+    readsEl.classList.remove('ok');
+    readsEl.innerHTML = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="8" r="6" stroke-dasharray="4 3"/></svg>';
+    return;
+  }
+  if (m.read === true || (m.session && m.session.visitorReadSeq >= m.seq)) {
+    readsEl.classList.add('ok');
+    readsEl.innerHTML = doubleTick();
+  } else {
+    readsEl.classList.remove('ok');
+    readsEl.innerHTML = singleTick();
+  }
+}
+function singleTick() { return '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 8.5 6 12 13.5 4"/></svg>'; }
+function doubleTick() { return '<svg viewBox="0 0 18 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 8.5 5 12 12.5 4"/><path d="M7 8.5 10.5 12 17 4.5"/></svg>'; }
+
+/** 绑定长按撤回 */
+function attachRecall(row, m) {
+  let timer = null, fired = false;
+  const start = () => {
+    fired = false;
+    timer = setTimeout(() => { fired = true; doRecall(m, row); }, 550);
+  };
+  const cancel = () => { clearTimeout(timer); };
+  row.addEventListener('touchstart', start, { passive: true });
+  row.addEventListener('touchmove', cancel);
+  row.addEventListener('touchend', cancel);
+  row.addEventListener('contextmenu', e => { e.preventDefault(); doRecall(m, row); });
+}
+function doRecall(m, row) {
+  if (!sid) return;
+  if (m.id && !confirm('确定撤回这条消息吗？')) return;
+  if (!m.id) return; // 尚未 ACK 的消息不支持撤回
+  send({ type: 'recall', sid, msgId: m.id });
+}
+
+/** 应用撤回（本地更新；区分自己/对方撤回） */
+function applyRecall(msgId) {
+  const row = domById.get(msgId);
+  if (!row) return;
+  row.classList.add('was-recalled');
+  const mine = row.classList.contains('me');
+  const b = row.querySelector('.bubble');
+  if (b) { b.className = 'bubble recalled'; b.textContent = mine ? '你撤回了一条消息' : '对方撤回了一条消息'; }
+  const meta = row.querySelector('.meta'); if (meta) meta.remove();
+  const btn = row.querySelector('.recall-btn'); if (btn) btn.remove();
+}
+
+/* ================= 连接 ================= */
+function wsUrl() {
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  return proto + '://' + location.host + '/ws';
+}
+function connect() {
+  $('#connState').classList.remove('show');
+  ws = new WebSocket(wsUrl());
+  ws.onopen = () => {
+    send({ type: 'hello', role: 'visitor', agentId, visitorId, visitorName });
+  };
+  ws.onmessage = ev => {
+    let d; try { d = JSON.parse(ev.data); } catch (e) { return; }
+    route(d);
+  };
+  ws.onclose = () => {
+    if (helloOk) $('#connState').classList.add('show');
+    scheduleReconnect();
+  };
+  ws.onerror = () => { try { ws.close(); } catch (e) {} };
+  // 心跳
+  if (connect._hb) clearInterval(connect._hb);
+  connect._hb = setInterval(() => { if (ws && ws.readyState === 1) send({ type: 'ping', t: Date.now() }); }, 25000);
+}
+function send(obj) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj)); }
+function scheduleReconnect() {
+  clearTimeout(reconnectTimer);
+  reconnectTimer = setTimeout(() => {
+    reconnectDelay = Math.min(reconnectDelay * 2, 15000);
+    connect();
+  }, reconnectDelay);
+}
+
+/* ================= 服务端事件路由 ================= */
+function route(d) {
+  switch (d.type) {
+    case 'ready': return onReady(d);
+    case 'ack': return onAck(d);
+    case 'msg': return onMsg(d);
+    case 'recall': return applyRecall(d.msgId);
+    case 'read': return onPeerRead(d);
+    case 'typing': return onTyping();
+    case 'presence': return onPresence(d);
+    case 'pong': return;
+    case 'error': return onError(d);
+  }
+}
+
+async function onReady(d) {
+  reconnectDelay = 1000;
+  helloOk = true;
+  $('#connState').classList.remove('show');
+  sid = d.sid;
+  agentOnline = !!d.agentOnline;
+  if (d.agentName) {
+    $('#agentName').textContent = d.agentName;
+    $('#avatar').textContent = (d.agentName || '客')[0];
+    document.title = d.agentName + ' - 在线客服';
+  }
+  refreshAgentStatus();
+
+  const knownMax = maxSeq;
+  const list = d.messages || [];
+  for (const m of list) renderIncoming(m, true);
+  scrollToBottom(false);
+  // 断线期间漏掉的消息（ready 里未包含）→ HTTP 增量补拉
+  const serverSeq = (d.session && d.session.msgSeq) || 0;
+  if (serverSeq > maxSeq) await pullMissing(knownMax);
+  // 重发未 ACK 的消息（同 cid，服务端幂等去重）
+  for (const [cid, p] of pendingMsgs) {
+    send({ type: 'msg', sid, cid, msgType: p.msgType, content: p.content });
+  }
+  reportRead();
+}
+
+/** 服务端消息统一渲染入口：按 seq 去重（WS 推送 / HTTP 补拉双通道不会重复渲染） */
+function renderIncoming(m, instant) {
+  if (!m) return;
+  if (!m.seq || renderedSeqs.has(m.seq)) return;
+  renderedSeqs.add(m.seq);
+  if (renderedSeqs.size > 1000) { // 控制内存：只保留近期去重窗口
+    const it = renderedSeqs.values();
+    for (let i = 0; i < 400; i++) renderedSeqs.delete(it.next().value);
+  }
+  if (m.seq > maxSeq) maxSeq = m.seq;
+  renderMsg(m, { instant: !!instant });
+}
+
+async function pullMissing(knownMax) {
+  try {
+    const r = await fetch('/api/visitor/messages?agentId=' + encodeURIComponent(agentId) +
+      '&visitorId=' + encodeURIComponent(visitorId) + '&after=' + knownMax);
+    const j = await r.json();
+    if (j.messages) for (const m of j.messages) renderIncoming(m, true);
+    scrollToBottom(false);
+  } catch (e) {}
+}
+
+function onAck(d) {
+  const row = domByCid.get(d.cid);
+  pendingMsgs.delete(d.cid);
+  if (!row || !d.message) return;
+  const m = d.message;
+  row.dataset.id = m.id;
+  row.dataset.seq = m.seq || 0;
+  domById.set(m.id, row);
+  if (m.seq) renderedSeqs.add(m.seq); // 自己发的消息也纳入 seq 去重，防止重连后全量补渲染时重复显示
+  if (m.seq > maxSeq) maxSeq = m.seq;
+  const m2 = { ...m, read: false };
+  updateReads(row, m2);
+}
+
+function onMsg(d) {
+  renderIncoming(d.message, false);
+  if (!d.message) return;
+  // 若自己在前台，立即上报已读
+  if (document.visibilityState === 'visible') reportRead();
+  else markUnreadTitle();
+}
+
+function onPeerRead(d) {
+  // 客服已读到 readSeq：自己 ≤readSeq 的消息全部改为双勾
+  for (const [id, row] of domById) {
+    const seq = parseInt(row.dataset.seq || '0', 10);
+    if (row.classList.contains('me') && seq && seq <= d.readSeq) {
+      const readsEl = row.querySelector('.reads');
+      if (readsEl) { readsEl.classList.add('ok'); readsEl.innerHTML = doubleTick(); }
+    }
+  }
+}
+
+function onTyping() {
+  const el = $('#typing');
+  el.classList.add('on');
+  clearTimeout(onTyping._t);
+  onTyping._t = setTimeout(() => el.classList.remove('on'), 2500);
+}
+
+function onPresence(d) {
+  if (d.who === 'agent') {
+    agentOnline = !!d.online;
+    refreshAgentStatus();
+  }
+}
+
+function onError(d) {
+  if (d.code === 'agent_not_found' || d.code === 'agent_disabled') {
+    helloOk = false;
+    clearTimeout(reconnectTimer);
+    msgsEl.innerHTML = '<div class="time-gap">' + esc(d.message || '链接无效') + '</div>';
+    $('#connState').classList.remove('show');
+  }
+}
+
+/* ================= 已读上报 ================= */
+function reportRead() {
+  if (!sid || maxSeq <= lastReadSeq) return;
+  lastReadSeq = maxSeq;
+  send({ type: 'read', sid, readSeq: maxSeq });
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    clearUnreadTitle();
+    reportRead();
+  }
+});
+
+/* ================= 状态展示 ================= */
+function refreshAgentStatus() {
+  const dot = $('#dot'), st = $('#statusText');
+  if (agentOnline) { dot.classList.add('on'); st.textContent = '在线'; $('#offlineTip').classList.remove('show'); }
+  else { dot.classList.remove('on'); st.textContent = '离线'; $('#offlineTip').classList.add('show'); }
+}
+let unreadCount = 0;
+function markUnreadTitle() {
+  unreadCount++;
+  document.title = '(' + unreadCount + ') ' + (document.title.replace(/^\(\d+\)\s*/, ''));
+}
+function clearUnreadTitle() {
+  if (!unreadCount) return;
+  unreadCount = 0;
+  document.title = document.title.replace(/^\(\d+\)\s*/, '');
+}
+
+/* ================= 发送 ================= */
+function sendMessage(msgType, content) {
+  if (!sid || !ws || ws.readyState !== 1) return alert('连接未就绪，请稍候…');
+  const cid = uuid();
+  const fake = { id: '', cid, from: 'visitor', type: msgType, content, ts: Date.now(), read: false };
+  const row = renderMsg(fake, { instant: true });
+  row.dataset.cid = cid;
+  pendingMsgs.set(cid, { msgType, content });
+  send({ type: 'msg', sid, cid, msgType, content });
+  setTimeout(scrollToBottom, 60);
+}
+
+$('#btnSend').onclick = () => {
+  const v = txtEl.value.trim();
+  if (!v) return;
+  txtEl.value = ''; autoGrow();
+  sendMessage('text', v.slice(0, 2000));
+};
+txtEl.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); $('#btnSend').click(); }
+});
+// 输入框自适应 + 正在输入上报（节流）
+function autoGrow() { txtEl.style.height = 'auto'; txtEl.style.height = Math.min(txtEl.scrollHeight, 96) + 'px'; }
+txtEl.addEventListener('input', () => {
+  autoGrow();
+  const now = Date.now();
+  if (sid && now - (autoGrow._last || 0) > 2000) {
+    autoGrow._last = now;
+    send({ type: 'typing', sid });
+  }
+});
+
+/* ================= 图片发送（本地压缩后 base64 上传） ================= */
+$('#btnImg').onclick = () => $('#file').click();
+$('#file').onchange = async e => {
+  const file = e.target.files && e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  if (file.size > 10 * 1024 * 1024) return alert('图片过大（>10MB），请换一张');
+  try {
+    const dataUrl = await compressImage(file);
+    $('#btnImg').disabled = true;
+    const r = await fetch('/api/visitor/upload', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dataUrl })
+    });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || '上传失败');
+    sendMessage('image', j.url);
+  } catch (err) {
+    alert(err.message || '图片发送失败');
+  } finally {
+    $('#btnImg').disabled = false;
+  }
+};
+
+/** 移动端常见场景：canvas 压缩到最长边 1280、JPEG 82%；
+    GIF（动图）与小于 300KB 的图直接原图上传 */
+function compressImage(file) {
+  return new Promise((resolve, reject) => {
+    if (file.type === 'image/gif' || file.size < 300 * 1024) {
+      const fr = new FileReader();
+      fr.onload = () => resolve(fr.result);
+      fr.onerror = reject;
+      return fr.readAsDataURL(file);
+    }
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      try {
+        const max = 1280;
+        const scale = Math.min(1, max / Math.max(img.width, img.height));
+        const c = document.createElement('canvas');
+        c.width = Math.max(1, Math.round(img.width * scale));
+        c.height = Math.max(1, Math.round(img.height * scale));
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        URL.revokeObjectURL(url);
+        c.toBlob(b => {
+          if (!b) return reject(new Error('压缩失败'));
+          const fr = new FileReader();
+          fr.onload = () => resolve(fr.result);
+          fr.onerror = reject;
+          fr.readAsDataURL(b);
+        }, 'image/jpeg', 0.82);
+      } catch (e) { reject(e); }
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('图片读取失败')); };
+    img.src = url;
+  });
+}
+
+/* ================= 图片预览 ================= */
+$('#viewer').onclick = () => $('#viewer').classList.remove('show');
+
+/* ================= 启动 ================= */
+(async function boot() {
+  if (!agentId) {
+    msgsEl.innerHTML = '<div class="time-gap">链接无效，请通过客服发送的链接进入</div>';
+    return;
+  }
+  // 先取客服公开信息（同时预热服务端会话）
+  try {
+    const r = await fetch('/api/public/agent-info?agentId=' + encodeURIComponent(agentId));
+    const j = await r.json();
+    if (r.ok) {
+      $('#agentName').textContent = j.agent.name;
+      $('#avatar').textContent = (j.agent.name || '客')[0];
+      document.title = j.agent.name + ' - 在线客服';
+    } else {
+      msgsEl.innerHTML = '<div class="time-gap">' + esc(j.error || '链接无效') + '</div>';
+      return;
+    }
+  } catch (e) { /* 网络异常时仍尝试 WS */ }
+  connect();
+})();
+</script>
+</body>
+</html>

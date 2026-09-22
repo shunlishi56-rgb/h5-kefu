@@ -1,0 +1,13 @@
+# 一键启动：docker compose up -d（老版本用 docker-compose up -d）
+# 访问: http://服务器IP:3000/admin  （admin / admin123）
+# 数据落在本机 ./data 与 ./uploads 目录，删容器不丢聊天记录
+services:
+  h5-kefu:
+    build: .
+    container_name: h5-kefu
+    ports:
+      - "3000:3000"          # 左边是外部端口，可自行修改
+    restart: always
+    volumes:
+      - ./data:/app/data
+      - ./uploads:/app/uploads

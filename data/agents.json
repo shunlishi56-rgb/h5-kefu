@@ -1,0 +1,26 @@
+[
+  {
+    "id": "a_5e8df13fe57c9709d7",
+    "username": "admin",
+    "passwordHash": "scrypt$df6d9a7f37c008adb11ad288$2fcb78f6fe5850093a49765633cee74ea3218b77cf64d3a2de3872ecd8bca08a",
+    "name": "管理员小测",
+    "role": "admin",
+    "welcome": "你好呀 {访客}，我是智能小助手~",
+    "quickReplies": [
+      "测试话术B"
+    ],
+    "disabled": false,
+    "createdAt": 1789923191729
+  },
+  {
+    "id": "a_e7e2ab7277246de8f0",
+    "username": "xiaoer",
+    "passwordHash": "scrypt$5af73b90e5db9094353fe264$d52b7367235503ac1dbbb0ecbcfd49d25c5f3d8b972d17937aa387a09375e439",
+    "name": "客服小二",
+    "role": "agent",
+    "welcome": "您好，很高兴为您服务，请问有什么可以帮您？",
+    "quickReplies": [],
+    "disabled": false,
+    "createdAt": 1789924190556
+  }
+]
