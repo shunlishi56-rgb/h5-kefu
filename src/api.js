@@ -168,6 +168,27 @@ router.post('/close-session', authRequired, (req, res) => {
   res.json({ ok: true });
 });
 
+/** 删除会话（彻底删除聊天记录，不可恢复） */
+router.delete('/sessions/:sid', authRequired, (req, res) => {
+  const sid = String(req.params.sid || '');
+  const session = store.getSession(sid);
+  if (!session || session.agentId !== req.agent.id) return res.status(404).json({ error: '会话不存在' });
+  try { hub.notifySessionDeleted(sid); } catch (e) { /* 通知失败不阻断删除 */ }
+  store.deleteSession(sid);
+  res.json({ ok: true });
+});
+
+/** 更新会话备注/标星 */
+router.put('/sessions/:sid', authRequired, (req, res) => {
+  const sid = String(req.params.sid || '');
+  const session = store.getSession(sid);
+  if (!session || session.agentId !== req.agent.id) return res.status(404).json({ error: '会话不存在' });
+  const { remark, starred } = req.body || {};
+  const updated = store.updateSessionMeta(sid, { remark, starred });
+  if (updated) hub.broadcastSessionUpdate(sid);
+  res.json({ ok: true, session: { ...updated, online: hub.isVisitorOnline(sid) } });
+});
+
 /** 客服端图片上传 */
 router.post('/upload', authRequired, (req, res) => {
   try {

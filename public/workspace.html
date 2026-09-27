@@ -42,6 +42,18 @@ svg{width:18px;height:18px;flex:none}
 .sitem{display:flex;gap:10px;padding:11px 14px;cursor:pointer;align-items:center;border-bottom:1px solid #f2f6fb;position:relative}
 .sitem:hover{background:#f6faff}
 .sitem.on{background:#edf5ff}
+/* 侧边栏操作按钮（删除、标星） */
+.sitem .actbtns{display:none;flex:none;flex-direction:column;gap:2px;margin-left:2px}
+.sitem:hover .actbtns,.sitem.on .actbtns{display:flex}
+.sitem .actbtn{width:24px;height:24px;border-radius:5px;display:flex;align-items:center;justify-content:center;
+  color:#98a8bc;background:none;padding:0;cursor:pointer}
+.sitem .actbtn:hover{background:#f0f4fa}
+.sitem .actbtn.star{color:#d4a820}
+.sitem .actbtn.star.on{color:#f0b400}
+.sitem .actbtn.del:hover{color:#f0554d;background:#fdecec}
+.sitem .star-mark{color:#f0b400;font-size:14px;flex:none;margin-right:2px}
+.sitem .remark-tag{font-size:11px;color:#6b7a90;background:#f0f4fa;border-radius:3px;padding:0 4px;margin-left:4px;max-width:60px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media(max-width:900px){.sitem .actbtns{display:flex;opacity:.5}.sitem .actbtns:hover{opacity:1}}
 .sitem .avatar{width:40px;height:40px;border-radius:10px;background:#b9c6d6;color:#fff;flex:none;
   display:flex;align-items:center;justify-content:center;font-size:15px}
 .sitem .mid{flex:1;min-width:0}
@@ -70,6 +82,7 @@ svg{width:18px;height:18px;flex:none}
 .dot.on{background:#2ec06e}
 .endbtn{border:1px solid var(--line);border-radius:8px;padding:6px 12px;font-size:12.5px;color:var(--txt2)}
 .endbtn:hover{color:#e05c5c;border-color:#f2c9c9;background:#fff5f5}
+.endbtn.danger{color:#e05c5c;border-color:#f2c9c9;margin-left:4px}
 #msgs{flex:1;overflow-y:auto;padding:18px 20px 8px}
 .time-gap{text-align:center;color:var(--txt2);font-size:11.5px;margin:8px 0 16px}
 .row{display:flex;margin-bottom:14px;align-items:flex-end;gap:8px}
@@ -167,6 +180,23 @@ textarea.finput{height:auto;padding:8px 10px;resize:vertical;min-height:70px;lin
   font-size:12.5px;padding:6px 16px;border-radius:16px;z-index:80;display:none}
 #connState.show{display:block}
 
+/* ============ 新消息悬浮通知 ============ */
+#notifyWrap{position:fixed;top:16px;right:16px;z-index:90;pointer-events:none;
+  display:flex;flex-direction:column;gap:8px;max-width:340px}
+.np-card{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.97);
+  border:1px solid var(--line);border-radius:12px;padding:10px 12px;box-shadow:0 4px 16px rgba(36,52,71,.12);
+  pointer-events:auto;cursor:pointer;animation:npIn .3s ease}
+@keyframes npIn{from{transform:translateX(120%);opacity:0}to{transform:translateX(0);opacity:1}}
+.np-card.out{animation:npOut .3s ease forwards}
+@keyframes npOut{to{transform:translateX(120%);opacity:0}}
+.np-avatar{width:36px;height:36px;border-radius:10px;background:#b9c6d6;color:#fff;flex:none;
+  display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:600}
+.np-body{flex:1;min-width:0}
+.np-name{font-size:13px;font-weight:600}
+.np-text{font-size:12px;color:var(--txt2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.np-close{flex:none;color:var(--txt2);font-size:18px;width:24px;height:24px;display:flex;align-items:center;justify-content:center}
+@media (max-width:900px){#notifyWrap{top:calc(10px + env(safe-area-inset-top,0px));right:10px;left:10px;max-width:none}}
+
 /* ============ 移动端 ============ */
 @media (max-width:900px){
   #side{width:100%;border-right:none}
@@ -223,7 +253,9 @@ textarea.finput{height:auto;padding:8px 10px;resize:vertical;min-height:70px;lin
           <div class="vname2" id="cvName">访客</div>
           <div class="vstatus"><span class="dot" id="cvDot"></span><span id="cvStatus">离线</span></div>
         </div>
+        <button class="endbtn" id="btnRemark" onclick="if(currentSid)editRemark(currentSid)">备注</button>
         <button class="endbtn" id="btnEnd" onclick="endSession()">结束会话</button>
+        <button class="endbtn danger" id="btnDel" onclick="if(currentSid)deleteSession(currentSid)">删除记录</button>
       </header>
       <div id="msgs"></div>
       <div id="typing"><span>对方正在输入…</span></div>
@@ -244,6 +276,7 @@ textarea.finput{height:auto;padding:8px 10px;resize:vertical;min-height:70px;lin
 <div id="viewer"><img id="viewerImg" alt=""></div>
 <div id="toast"></div>
 <div id="connState">连接已断开，正在重连…</div>
+<div id="notifyWrap"></div>
 
 <script>
 'use strict';
@@ -363,6 +396,7 @@ function onReady(d){
   $('#myName').textContent=agent.name;
   $('#mySub').textContent=(agent.role==='admin'?'管理员':'客服')+' · 在线';
   if(agent.role==='admin')$('#btnAgents').style.display='';
+  notifySoundType=agent.notifySound||'beep';  // 读取提示音偏好
   renderList();
   renderQuickbar();
   // 断线重连恢复：补拉当前会话漏掉的消息 + 重发未确认消息（服务端按 cid 幂等去重）
@@ -389,8 +423,9 @@ function onMsg(d){
     // 正在查看该会话 → 立即已读
     reportRead();
   }else{
-    beep();
+    playNotifySound();
     flashTitle();
+    showNotifyCard(d.session||m, m);
   }
 }
 
@@ -462,10 +497,19 @@ function renderList(){
   const openArr=sessions.filter(s=>s.status==='open');
   $('#cnt-open').textContent=openArr.length;
   $('#cnt-closed').textContent=sessions.length-openArr.length;
-  const arr=sessions.filter(s=>{
+  let arr=sessions.filter(s=>{
     if(s.status!==currentTab)return false;
-    if(q&&!(s.visitorName||'').toLowerCase().includes(q))return false;
+    if(q){
+      const name=(s.visitorName||'').toLowerCase();
+      const remark=(s.remark||'').toLowerCase();
+      if(!name.includes(q)&&!remark.includes(q))return false;
+    }
     return true;
+  });
+  // 标星置顶排序：starred=true 的排最前，组内按 lastMsgAt 降序
+  arr.sort((a,b)=>{
+    if(!!b.starred - !!a.starred) return !!b.starred - !!a.starred ? 1 : -1;
+    return b.lastMsgAt-a.lastMsgAt;
   });
   const el=$('#slist');
   el.innerHTML='';
@@ -473,17 +517,88 @@ function renderList(){
   for(const s of arr){
     const item=document.createElement('div');
     item.className='sitem'+(s.sid===currentSid?' on':'');
+    const dispName=s.remark||s.visitorName||'访客';
     item.innerHTML=
+      (s.starred?'<span class="star-mark">★</span>':'')+
       '<div class="avatar">'+esc((s.visitorName||'客')[0])+'</div>'+
       '<div class="mid">'+
-        '<div class="l1"><span class="vname">'+esc(s.visitorName||'访客')+'</span><span class="tm">'+fmtListTime(s.lastMsgAt)+'</span></div>'+
+        '<div class="l1"><span class="vname">'+esc(dispName)+'</span>'+
+          (s.remark?'<span class="remark-tag" title="'+esc(s.remark)+'">'+esc(s.remark)+'</span>':'')+
+          '<span class="tm">'+fmtListTime(s.lastMsgAt)+'</span></div>'+
         '<div class="l2"><span class="prev">'+esc(s.lastMsgPreview||'')+'</span>'+
           (s.unreadAgent>0?'<span class="badge">'+(s.unreadAgent>99?'99+':s.unreadAgent)+'</span>':(s.online?'<span class="dot-on"></span>':'<span class="dot-off"></span>'))+
         '</div>'+
+      '</div>'+
+      '<div class="actbtns">'+
+        '<button class="actbtn star'+(s.starred?' on':'')+'" title="标星置顶" onclick="event.stopPropagation();toggleStar(\''+s.sid+'\')">'+(s.starred?'★':'☆')+'</button>'+
+        '<button class="actbtn del" title="删除聊天记录" onclick="event.stopPropagation();deleteSession(\''+s.sid+'\')">'+
+          '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>'+
+        '</button>'+
       '</div>';
     item.onclick=()=>openSession(s.sid);
     el.appendChild(item);
   }
+}
+
+/* ================= 删除会话 ================= */
+async function deleteSession(sid){
+  if(!sid)return;
+  const s=sessions.find(x=>x.sid===sid);
+  const name=(s&&s.remark)|| (s&&s.visitorName)||'该访客';
+  if(!confirm('确定删除「'+name+'」的全部聊天记录？\\n删除后不可恢复。'))return;
+  try{
+    await api('/api/sessions/'+encodeURIComponent(sid),{method:'DELETE'});
+    sessions=sessions.filter(x=>x.sid!==sid);
+    if(currentSid===sid){
+      currentSid='';
+      $('#chatwrap').classList.remove('show');
+      $('#nochat').style.display='';
+      $('#msgs').innerHTML='';
+      document.body.classList.remove('show-chat');
+    }
+    renderList();
+    toast('聊天记录已删除');
+  }catch(e){toast(e.message);}
+}
+
+/* ================= 标星/置顶 ================= */
+async function toggleStar(sid){
+  const s=sessions.find(x=>x.sid===sid);
+  if(!s)return;
+  const starred=!s.starred;
+  try{
+    await api('/api/sessions/'+encodeURIComponent(sid),{method:'PUT',body:JSON.stringify({starred})});
+    s.starred=starred;
+    renderList();
+    toast(starred?'已标星置顶':'已取消标星');
+  }catch(e){toast(e.message);}
+}
+
+/* ================= 访客备注 ================= */
+async function editRemark(sid){
+  const s=sessions.find(x=>x.sid===sid);
+  if(!s)return;
+  const current=s.remark||'';
+  // 用简易弹窗输入
+  const html='<h3>访客备注 <button class="x" onclick="closeModal()">×</button></h3>'+
+    '<div class="muted">给「'+esc(s.visitorName||'访客')+'」加个备注名，方便识别。留空则清除备注。</div>'+
+    '<div style="margin:12px 0"><input id="remarkInput" style="width:100%;height:40px;border:1px solid var(--line);border-radius:8px;padding:0 12px;font-size:15px;background:#fbfdff" value="'+esc(current)+'" maxlength="50" placeholder="如：VIP客户 / 待跟进"></div>'+
+    '<div style="display:flex;gap:10px"><button onclick="closeModal()" style="flex:1;height:40px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--txt2)">取消</button>'+
+    '<button onclick="saveRemark(\''+sid+'\')" style="flex:1;height:40px;border:none;border-radius:8px;background:var(--blue);color:#fff">保存</button></div>';
+  openModal(html);
+  setTimeout(()=>{const inp=$('#remarkInput');if(inp){inp.focus();inp.select();inp.addEventListener('keydown',e=>{if(e.key==='Enter')saveRemark(sid);});}},100);
+}
+async function saveRemark(sid){
+  const v=$('#remarkInput').value.trim();
+  try{
+    await api('/api/sessions/'+encodeURIComponent(sid),{method:'PUT',body:JSON.stringify({remark:v})});
+    const s=sessions.find(x=>x.sid===sid);
+    if(s)s.remark=v;
+    renderList();
+    if(currentSid===sid)refreshChatHead(sessions.find(x=>x.sid===sid));
+    closeModal();
+    toast(v?'备注已保存':'备注已清除');
+  }catch(e){toast(e.message);}
 }
 
 /* ================= 打开会话 ================= */
@@ -519,7 +634,8 @@ async function openSession(sid){
 }
 
 function refreshChatHead(s){
-  $('#cvName').textContent=s.visitorName||'访客';
+  const dispName=s.remark||s.visitorName||'访客';
+  $('#cvName').textContent=dispName;
   $('#cvDot').classList.toggle('on',!!s.online);
   $('#cvStatus').textContent=s.online?'在线':'离线';
   $('#btnEnd').style.display=s.status==='closed'?'none':'';
@@ -603,7 +719,7 @@ function renderMsg(m,opts){
 }
 function currentVisitorName(){
   const s=sessions.find(x=>x.sid===currentSid);
-  return (s&&s.visitorName)||'访客';
+  return (s&&(s.remark||s.visitorName))||'访客';
 }
 function currentSessionMeta(){const s=sessions.find(x=>x.sid===currentSid);return s||null;}
 function scrollBottom(smooth){$('#msgs').scrollTo({top:$('#msgs').scrollHeight,behavior:smooth?'smooth':'auto'});}
@@ -761,16 +877,36 @@ function openSettings(){
     '<input class="finput" id="fName" maxlength="30" value="'+esc(agent.name)+'">'+
     '<label class="flabel">自动欢迎语（访客首次进入会话时自动发送，可用 {访客} 代入昵称）</label>'+
     '<textarea class="finput" id="fWelcome" maxlength="500">'+esc(agent.welcome||'')+'</textarea>'+
+    '<label class="flabel">新消息提示音</label>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">'+
+      soundRadio('beep','短促蜂鸣')+
+      soundRadio('ding','清脆叮')+
+      soundRadio('bell','铃声')+
+      soundRadio('none','静音')+
+    '</div>'+
     '<label class="flabel">修改密码（留空则不修改）</label>'+
     '<input class="finput" id="fOld" type="password" placeholder="原密码">'+
     '<input class="finput" id="fNew" type="password" placeholder="新密码（至少6位）" style="margin-top:8px">'+
     '<div class="fbtns"><button class="fbtn sec" onclick="closeModal()">取消</button>'+
     '<button class="fbtn pri" onclick="saveSettings()">保存</button></div>');
 }
+function soundRadio(val,label){
+  const cur=agent.notifySound||'beep';
+  const on=cur===val;
+  return '<label style="display:flex;align-items:center;gap:5px;cursor:pointer;padding:8px 14px;border-radius:8px;border:1px solid '+(on?'var(--blue)':'var(--line)')+';background:'+(on?'#eef6ff':'#fbfdff')+';font-size:13px;color:'+(on?'var(--blue)':'var(--txt2)')+'">'+
+    '<input type="radio" name="soundType" value="'+val+'" '+(on?'checked':'')+' onchange="previewSound(\''+val+'\')" style="margin:0">'+
+    '<span>'+label+'</span></label>';
+}
+function previewSound(type){
+  notifySoundType=type;
+  if(type!=='none')playNotifySound();  // 选了就试听
+}
 async function saveSettings(){
   const name=$('#fName').value.trim();
   const welcome=$('#fWelcome').value;
-  const body={name,welcome};
+  const soundEl=document.querySelector('input[name="soundType"]:checked');
+  const notifySound=soundEl?soundEl.value:'beep';
+  const body={name,welcome,notifySound};
   if($('#fNew').value){
     if($('#fNew').value.length<6)return toast('新密码至少 6 位');
     body.password=$('#fNew').value;
@@ -779,6 +915,7 @@ async function saveSettings(){
   try{
     const j=await api('/me',{method:'PUT',body:JSON.stringify(body)});
     agent=j.agent;
+    notifySoundType=agent.notifySound||'beep';
     $('#myName').textContent=agent.name;
     toast('已保存');
     closeModal();
@@ -864,15 +1001,34 @@ function closeModal(){$('#mask').classList.remove('show');}
 $('#mask').addEventListener('click',e=>{if(e.target.id==='mask')closeModal();});
 
 /* ================= 提醒 ================= */
-function beep(){
+/* 多提示音类型：从客服设置中读取 notifySound（beep/ding/bell/none），用 Web Audio 合成 */
+let notifySoundType='beep';
+function playNotifySound(){
+  if(notifySoundType==='none')return;
   try{
-    const ctx=beep._ctx||(beep._ctx=new (window.AudioContext||window.webkitAudioContext)());
+    const ctx=playNotifySound._ctx||(playNotifySound._ctx=new (window.AudioContext||window.webkitAudioContext)());
+    if(ctx.state==='suspended')ctx.resume();
+    const presets={
+      beep:{freq:880,dur:0.25,type:'sine',vol:0.08},
+      ding:{freq:1318,dur:0.35,type:'sine',vol:0.1,decay:true},
+      bell:{freq:523.25,dur:0.5,type:'triangle',vol:0.12,harmonic:2},
+    };
+    const p=presets[notifySoundType]||presets.beep;
     const o=ctx.createOscillator(),g=ctx.createGain();
-    o.frequency.value=880;o.type='sine';
-    g.gain.setValueAtTime(0.08,ctx.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+0.25);
+    o.frequency.value=p.freq;o.type=p.type||'sine';
+    g.gain.setValueAtTime(p.vol||0.08,ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+p.dur);
     o.connect(g);g.connect(ctx.destination);
-    o.start();o.stop(ctx.currentTime+0.25);
+    o.start();o.stop(ctx.currentTime+p.dur);
+    // bell 加一个低八度泛音
+    if(p.harmonic){
+      const o2=ctx.createOscillator(),g2=ctx.createGain();
+      o2.frequency.value=p.freq*p.harmonic;o2.type=p.type;
+      g2.gain.setValueAtTime(p.vol*0.5,ctx.currentTime);
+      g2.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+p.dur);
+      o2.connect(g2);g2.connect(ctx.destination);
+      o2.start();o2.stop(ctx.currentTime+p.dur);
+    }
   }catch(e){}
 }
 function flashTitle(){
@@ -882,6 +1038,45 @@ function flashTitle(){
       document.title=document.title.includes('🔴')?'💬 新消息 - 客服工作台':'🔴 新消息 - 客服工作台';
     },900);
   }
+}
+
+/* ---- 悬浮通知卡片（非当前会话来消息时右上角弹出，点击切换会话） ---- */
+const notifyWrap=$('#notifyWrap');
+function showNotifyCard(session,msg){
+  if(!session&&!msg)return;
+  const sid=session?session.sid:(msg?msg.sid:'');
+  const s=sessions.find(x=>x.sid===sid);
+  const vName=s?((s.remark||s.visitorName)):(session?session.visitorName:'访客');
+  const preview=msg?(msg.type==='image'?'[图片]':(msg.content||'').slice(0,60)):'';
+  const existing=notifyWrap.querySelector('.np-card[data-sid="'+sid+'"]');
+  if(existing){
+    existing.querySelector('.np-text').textContent=preview;
+    clearTimeout(existing._timer);
+    existing._timer=setTimeout(()=>dismissNotifyCard(existing),4000);
+    return;
+  }
+  const card=document.createElement('div');
+  card.className='np-card';
+  card.dataset.sid=sid;
+  card.innerHTML=
+    '<div class="np-avatar">'+esc((vName||'客')[0])+'</div>'+
+    '<div class="np-body"><div class="np-name">'+esc(vName||'访客')+'</div>'+
+    '<div class="np-text">'+esc(preview)+'</div></div>'+
+    '<div class="np-close">×</div>';
+  card.onclick=(e)=>{
+    if(e.target.classList.contains('np-close')){dismissNotifyCard(card);return;}
+    dismissNotifyCard(card);
+    if(sid)openSession(sid);
+  };
+  notifyWrap.appendChild(card);
+  while(notifyWrap.children.length>4)notifyWrap.removeChild(notifyWrap.firstChild);
+  card._timer=setTimeout(()=>dismissNotifyCard(card),4000);
+}
+function dismissNotifyCard(card){
+  if(!card||!card.parentNode)return;
+  clearTimeout(card._timer);
+  card.classList.add('out');
+  setTimeout(()=>{if(card.parentNode)card.parentNode.removeChild(card);},300);
 }
 document.addEventListener('visibilitychange',()=>{
   if(document.visibilityState==='visible'){

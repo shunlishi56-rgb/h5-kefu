@@ -83,6 +83,7 @@ function init() {
       role: 'admin',
       welcome: '您好，很高兴为您服务，请问有什么可以帮您？',
       quickReplies: ['您好，请稍等，我这边看一下~', '好的，没问题', '请您详细描述一下您的问题', '感谢您的咨询，还有其他问题吗？'],
+      notifySound: 'beep',          // 提示音类型：beep|ding|bell|none
       disabled: false,
       createdAt: Date.now()
     };
@@ -128,6 +129,7 @@ function createAgent({ username, name, password, role }) {
     role: role === 'admin' ? 'admin' : 'agent',
     welcome: '您好，很高兴为您服务，请问有什么可以帮您？',
     quickReplies: [],
+    notifySound: 'beep',
     disabled: false,
     createdAt: Date.now()
   };
@@ -153,6 +155,7 @@ function updateAgent(id, patch) {
       .map(s => s.slice(0, 500));
   }
   if (typeof patch.disabled === 'boolean') agent.disabled = patch.disabled;
+  if (typeof patch.notifySound === 'string') agent.notifySound = patch.notifySound; // 提示音类型：'beep'|'ding'|'bell'|'none'
   if (typeof patch.username === 'string' && patch.username.trim() && patch.username !== agent.username) {
     if (getAgentByUsername(patch.username.trim())) throw new Error('登录账号已存在');
     agent.username = patch.username.trim();
@@ -243,6 +246,8 @@ function getOrCreateSession(agentId, visitorId, visitorName) {
     agentId,
     visitorId,
     visitorName: visitorName || ('访客' + String(now).slice(-6)),
+    remark: '',                       // 客服给访客的备注名（空则显示 visitorName）
+    starred: false,                   // 标星/置顶（true 排在列表最前）
     status: 'open',                 // open=进行中 closed=已结束
     createdAt: now,
     lastMsgAt: now,
@@ -289,6 +294,33 @@ function closeSession(sid) {
   if (!meta) return null;
   meta.status = 'closed';
   meta.closedAt = Date.now();
+  saveMeta(meta);
+  return meta;
+}
+
+/**
+ * 彻底删除会话：清理内存 + 删除磁盘文件。不可恢复。
+ */
+function deleteSession(sid) {
+  const meta = sessions.get(sid);
+  if (!meta) return null;
+  sessions.delete(sid);
+  cidIndex.delete(sid);
+  cidInited.delete(sid);
+  try { fs.unlinkSync(metaFile(sid)); } catch (e) { /* 文件不存在则忽略 */ }
+  try { fs.unlinkSync(msgFile(sid)); } catch (e) { /* 文件不存在则忽略 */ }
+  return meta;
+}
+
+/**
+ * 更新会话元数据的部分字段（用于备注、标星等）。
+ * patch 可含：remark / starred
+ */
+function updateSessionMeta(sid, patch) {
+  const meta = sessions.get(sid);
+  if (!meta) return null;
+  if (typeof patch.remark === 'string') meta.remark = patch.remark.slice(0, 50);
+  if (typeof patch.starred === 'boolean') meta.starred = patch.starred;
   saveMeta(meta);
   return meta;
 }
@@ -496,7 +528,7 @@ module.exports = {
   init,
   listAgents, getAgent, getAgentByUsername, createAgent, updateAgent, deleteAgent,
   issueToken, verifyToken, revokeToken,
-  getOrCreateSession, getSession, listSessions, listSessionSids, closeSession, reopenSession,
+  getOrCreateSession, getSession, listSessions, listSessionSids, closeSession, deleteSession, updateSessionMeta, reopenSession,
   appendMessage, appendRecall, listMessages, markRead,
   hashPassword, checkPassword,
   sidOf, randomId

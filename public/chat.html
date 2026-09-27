@@ -84,6 +84,22 @@ body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei
 #connState{position:fixed;top:60px;left:50%;transform:translateX(-50%);background:rgba(36,52,71,.85);
   color:#fff;font-size:12.5px;padding:6px 16px;border-radius:16px;z-index:50;display:none}
 #connState.show{display:block}
+/* ---------- 新消息悬浮通知 ---------- */
+#notifyPopup{position:fixed;top:calc(10px + env(safe-area-inset-top,0px));left:10px;right:10px;
+  z-index:60;pointer-events:none;display:flex;flex-direction:column;gap:8px}
+.np-card{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.96);
+  border:1px solid var(--line);border-radius:12px;padding:10px 12px;box-shadow:0 4px 16px rgba(36,52,71,.12);
+  pointer-events:auto;cursor:pointer;animation:npSlide .3s ease;max-width:380px;margin:0 auto}
+@keyframes npSlide{from{transform:translateY(-100%);opacity:0}to{transform:translateY(0);opacity:1}}
+.np-card.out{animation:npOut .3s ease forwards}
+@keyframes npOut{to{transform:translateY(-100%);opacity:0}}
+.np-avatar{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#4c9bf5,#2b7de9);
+  color:#fff;display:flex;align-items:center;justify-content:center;font-size:15px;flex:none;font-weight:600}
+.np-body{flex:1;min-width:0}
+.np-name{font-size:13px;font-weight:600;color:var(--txt)}
+.np-text{font-size:12.5px;color:var(--txt2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.np-close{flex:none;color:var(--txt2);font-size:18px;width:24px;height:24px;display:flex;align-items:center;justify-content:center}
+.np-close:active{color:var(--txt)}
 </style>
 </head>
 <body>
@@ -113,6 +129,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei
 </footer>
 
 <div id="viewer"><img id="viewerImg" alt="图片预览"></div>
+<div id="notifyPopup"></div>
 
 <script>
 'use strict';
@@ -336,9 +353,27 @@ function route(d) {
     case 'read': return onPeerRead(d);
     case 'typing': return onTyping();
     case 'presence': return onPresence(d);
+    case 'session_deleted': return onSessionDeleted();
     case 'pong': return;
     case 'error': return onError(d);
   }
+}
+
+/** 会话被客服删除：提示并重置本地状态（WS 被服务端关闭后会自动重连开新会话） */
+function onSessionDeleted() {
+  sid = '';
+  maxSeq = 0;
+  lastReadSeq = 0;
+  helloOk = false;
+  pendingMsgs.clear();
+  domById.clear();
+  domByCid.clear();
+  renderedSeqs.clear();
+  msgsEl.innerHTML = '';
+  const tip = document.createElement('div');
+  tip.className = 'time-gap';
+  tip.textContent = '客服已清除本次对话记录';
+  msgsEl.appendChild(tip);
 }
 
 async function onReady(d) {
@@ -409,9 +444,64 @@ function onMsg(d) {
   renderIncoming(d.message, false);
   if (!d.message) return;
   // 若自己在前台，立即上报已读
-  if (document.visibilityState === 'visible') reportRead();
-  else markUnreadTitle();
+  if (document.visibilityState === 'visible') {
+    reportRead();
+  } else {
+    markUnreadTitle();
+    // 页面不可见时：播放提示音 + 弹窗通知
+    if (d.message.from === 'agent') {
+      beep();
+      const preview = d.message.type === 'image' ? '[图片]' : (d.message.content || '').slice(0, 50);
+      showNotifyPopup($('#agentName').textContent, preview);
+    }
+  }
 }
+
+/* ================= 新消息提示音 + 弹窗通知 ================= */
+let audioCtx = null;
+function beep() {
+  try {
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+    o.frequency.value = 880; o.type = 'sine';
+    g.gain.setValueAtTime(0.08, audioCtx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.25);
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start(); o.stop(audioCtx.currentTime + 0.25);
+  } catch (e) {}
+}
+const notifyPopup = $('#notifyPopup');
+function showNotifyPopup(name, preview) {
+  const card = document.createElement('div');
+  card.className = 'np-card';
+  card.innerHTML =
+    '<div class="np-avatar">' + esc((name || '客')[0]) + '</div>' +
+    '<div class="np-body"><div class="np-name">' + esc(name || '客服') + '</div>' +
+    '<div class="np-text">' + esc(preview) + '</div></div>' +
+    '<div class="np-close">×</div>';
+  card.onclick = () => dismissNotify(card);
+  notifyPopup.appendChild(card);
+  while (notifyPopup.children.length > 3) notifyPopup.removeChild(notifyPopup.firstChild);
+  card._timer = setTimeout(() => dismissNotify(card), 4000);
+}
+function dismissNotify(card) {
+  if (!card || !card.parentNode) return;
+  clearTimeout(card._timer);
+  card.classList.add('out');
+  setTimeout(() => { if (card.parentNode) card.parentNode.removeChild(card); }, 300);
+}
+// 首次交互解锁音频（手机浏览器要求用户交互后才能播放声音）
+function unlockAudio() {
+  try {
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+  } catch (e) {}
+  document.removeEventListener('touchstart', unlockAudio);
+  document.removeEventListener('click', unlockAudio);
+}
+document.addEventListener('touchstart', unlockAudio, { passive: true });
+document.addEventListener('click', unlockAudio);
 
 function onPeerRead(d) {
   // 客服已读到 readSeq：自己 ≤readSeq 的消息全部改为双勾

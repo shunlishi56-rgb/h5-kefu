@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>H5 在线客服系统 · 运维排查手册</title>
+<style>
+/* ========== Reset & Base ========== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { min-height: 100%; }
+body {
+  position: relative;
+  font-family: -apple-system, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI", "Noto Sans SC", sans-serif;
+  color: #1f2d3d;
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 40px 24px;
+  background: linear-gradient(160deg, #f8fafc 0%, #ffffff 45%, #cfe0f5 100%);
+  min-height: 100vh;
+}
+/* 全局光斑 */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 45% 35% at 18% 8%, rgba(255,255,255,0.55) 0%, transparent 60%),
+    radial-gradient(ellipse 40% 30% at 88% 90%, rgba(255,255,255,0.45) 0%, transparent 55%);
+}
+body > * { position: relative; z-index: 1; }
+
+/* ========== 封面 Hero ========== */
+.title {
+  position: relative;
+  overflow: hidden;
+  padding: 56px 40px;
+  text-align: center;
+  background: linear-gradient(135deg, #1e3a5f 0%, #3b82f6 50%, #4f8ef7 100%);
+  color: #ffffff;
+  border-radius: 16px;
+  margin-bottom: 24px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+}
+.title::before {
+  content: '';
+  position: absolute; inset: 0;
+  background:
+    radial-gradient(ellipse 70% 55% at 18% 82%, rgba(255,255,255,0.12) 0%, transparent 60%),
+    radial-gradient(ellipse 55% 40% at 82% 18%, rgba(255,255,255,0.08) 0%, transparent 55%);
+  pointer-events: none;
+}
+.title > * { position: relative; z-index: 1; }
+.title h1 { font-size: 28px; font-weight: 800; margin: 0 0 14px 0; letter-spacing: 1px; color: #ffffff; }
+.title .accent-line {
+  width: 48px; height: 3px; background: rgba(255,255,255,0.85);
+  margin: 0 auto 18px; border-radius: 2px;
+}
+.title p { font-size: 15px; color: rgba(255,255,255,0.85); margin: 0; line-height: 1.7; }
+
+/* ========== 章节标题 ========== */
+h1.heading {
+  font-size: 28px;
+  color: #0f1e33;
+  margin: 36px 0 16px 0;
+  font-weight: 700;
+  border-left: 4px solid #3b82f6;
+  padding-left: 16px;
+}
+h2.heading {
+  font-size: 22px;
+  color: #0f1e33;
+  margin: 28px 0 12px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #c9d6f3;
+  font-weight: 600;
+}
+
+/* ========== 正文 / 列表 ========== */
+.paragraph { font-size: 15px; color: #1f2d3d; line-height: 1.8; margin: 0 0 16px 0; text-indent: 2em; }
+.paragraph.no-indent { text-indent: 0; }
+.list { margin: 0 0 16px 0; padding-left: 24px; font-size: 15px; color: #1f2d3d; line-height: 1.8; }
+.list li { margin-bottom: 8px; }
+.list li::marker { color: #3b82f6; }
+
+/* ========== callout ========== */
+.callout {
+  margin: 0 0 16px 0;
+  padding: 16px 24px;
+  background: #e8f0fe;
+  border-left: 4px solid #3b82f6;
+  border-radius: 8px;
+}
+.callout[data-variant="warning"] { background: #FFF3E0; border-left-color: #d97706; }
+.callout[data-variant="tip"] { background: #E8F5E9; border-left-color: #16a34a; }
+.callout p { font-size: 15px; color: #1f2d3d; margin: 0; line-height: 1.8; }
+.callout p strong { color: #0f1e33; }
+
+/* ========== 深挖折叠 ========== */
+details.deep-dive {
+  background: #ffffff;
+  border-radius: 10px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+  margin: 0 0 16px 0;
+  padding: 4px 0;
+  border-left: 3px solid #3b82f6;
+}
+details.deep-dive summary {
+  padding: 14px 20px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #0f1e33;
+  cursor: pointer;
+}
+details.deep-dive .content { padding: 0 20px 16px; }
+details.deep-dive .content p:last-child { margin-bottom: 0; }
+
+/* ========== 步骤条（timeline） ========== */
+.timeline { list-style: none; padding: 0; margin: 0 0 16px 0; }
+.timeline li {
+  position: relative;
+  padding-left: 28px;
+  padding-bottom: 18px;
+  border-left: 2px solid #e8f0fe;
+  margin-left: 6px;
+}
+.timeline li:last-child { border-left-color: transparent; padding-bottom: 0; }
+.timeline li::before {
+  content: '';
+  position: absolute;
+  left: -7px; top: 5px;
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  background: #3b82f6;
+  border: 2px solid #f4f7fb;
+  box-shadow: 0 0 0 2px #e8f0fe;
+}
+.timeline strong { font-size: 14px; color: #2563eb; }
+.timeline p { font-size: 15px; color: #1f2d3d; margin: 4px 0 0 0; line-height: 1.8; }
+
+/* ========== code ========== */
+.code {
+  background: #1e293b;
+  color: #e2e8f0;
+  padding: 16px 24px;
+  border-radius: 8px;
+  font-size: 14px;
+  line-height: 1.6;
+  overflow-x: auto;
+  margin: 0 0 16px 0;
+  font-family: 'Cascadia Code', 'Fira Code', 'SF Mono', 'Source Code Pro', Consolas, monospace;
+}
+.code .cmt { color: #94a3b8; }
+
+/* ========== 表格 ========== */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0 0 16px 0;
+  background: #ffffff;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+  font-size: 14px;
+}
+.table th {
+  background: linear-gradient(90deg, #c9d6f3, #e8f0fe);
+  color: #0f1e33;
+  text-align: left;
+  padding: 10px 14px;
+  font-weight: 600;
+  border-bottom: 2px solid #dbe4ef;
+}
+.table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid #dbe4ef;
+  color: #1f2d3d;
+  line-height: 1.7;
+  vertical-align: top;
+}
+.table tr:last-child td { border-bottom: none; }
+.table tr:nth-child(even) td { background: #eef5ff; }
+.table td code {
+  background: #1e293b;
+  color: #e2e8f0;
+  padding: 1px 7px;
+  border-radius: 4px;
+  font-size: 12.5px;
+  font-family: Consolas, monospace;
+  word-break: break-all;
+}
+
+/* ========== 卡片 ========== */
+.card {
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  padding: 20px 24px;
+  margin: 0 0 16px 0;
+  border: 1px solid #dbe4ef;
+}
+.card h3 { font-size: 16px; color: #0f1e33; margin: 0 0 10px 0; font-weight: 700; }
+.card p { font-size: 14px; color: #5b6b80; line-height: 1.8; margin: 0; }
+.card p + p { margin-top: 8px; }
+
+/* ========== FAQ（浅底问答卡） ========== */
+.faq-item {
+  margin: 0 0 12px 0;
+  padding: 16px 20px;
+  background: #ffffff;
+  border-radius: 10px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+  border-left: 3px solid #e8f0fe;
+}
+.faq-item:hover { border-left-color: #3b82f6; }
+.faq-item .q { font-size: 15px; font-weight: bold; color: #0f1e33; margin: 0 0 6px 0; }
+.faq-item .a { font-size: 15px; color: #1f2d3d; margin: 0; padding-left: 16px; line-height: 1.8; }
+
+/* ========== 尾页 ========== */
+.end_page {
+  margin-top: 24px;
+  padding: 56px 24px;
+  text-align: center;
+  background: linear-gradient(135deg, #c9d6f3 0%, #e8f0fe 100%);
+  border-radius: 16px;
+}
+.end_page h1 { font-size: 28px; color: #0f1e33; margin: 0 0 16px 0; font-weight: 800; }
+.end_page p  { font-size: 15px; color: #5b6b80; margin: 0; line-height: 1.8; }
+
+/* ========== 响应式 ========== */
+@media screen and (max-width: 600px) {
+  body { padding: 16px !important; }
+  h1 { font-size: 22px !important; }
+  h2 { font-size: 18px !important; }
+  h3 { font-size: 16px !important; }
+  .table { font-size: 13px; }
+  .table th, .table td { padding: 8px 10px; }
+}
+
+/* ========== 打印优化 ========== */
+@media print {
+  body {
+    padding: 0 !important;
+    margin: 0 !important;
+    background: #f4f7fb;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  body::before { display: none; }
+  .title, .end_page { border-radius: 0; box-shadow: none; }
+  .faq-item, details.deep-dive, .card { box-shadow: none; border: 1px solid #dbe4ef; }
+  section { break-inside: auto !important; }
+  details.deep-dive { page-break-inside: avoid; }
+}
+</style>
+</head>
+<body class="mode-explainer" data-palette="ink-blue">
+
+  <!-- ===== 封面 ===== -->
+  <section class="title">
+    <h1>H5 在线客服系统 · 运维排查手册</h1>
+    <div class="accent-line"></div>
+    <p>进程 / 端口 / 保活 / 数据 / 会话机制 —— 从「服务挂了」到「自己搞定」</p>
+  </section>
+
+  <!-- ===== 前置说明 ===== -->
+  <aside class="callout">
+    <p><strong>适用说明：</strong>本手册适用于已部署的 H5 在线客服系统（Node.js 版）。文中命令默认约定：项目目录 <strong>/www/wwwroot/h5-kefu-v2</strong>、服务端口 <strong>3000</strong>。若你的实际目录或端口不同，把命令中对应的部分替换即可。所有命令均在服务器的 SSH 终端（宝塔终端 / Xshell）中执行，可直接整段复制粘贴。</p>
+  </aside>
+
+  <!-- ===== 第一章：30秒快速自检 ===== -->
+  <h1 class="heading">一、30 秒快速自检</h1>
+  <p class="paragraph">遇到任何异常，先跑这三板斧，90% 的问题在 30 秒内就能定位方向：进程活没活、端口通没通、页面开不开。</p>
+
+  <ol class="timeline">
+    <li>
+      <strong>第一板斧：看进程</strong>
+      <p>检查 node server.js 进程还在不在，顺便看它的启动时间和已存活时长。</p>
+    </li>
+    <li>
+      <strong>第二板斧：看端口</strong>
+      <p>检查 3000 端口有没有进程在监听，以及是「谁」在监听。</p>
+    </li>
+    <li>
+      <strong>第三板斧：看页面</strong>
+      <p>浏览器访问 http://你的服务器IP:3000/admin ，看客服后台能不能打开。</p>
+    </li>
+  </ol>
+
+  <pre class="code" data-lang="bash"><code><span class="cmt"># 第一板斧 + 第二板斧，两条命令直接复制执行</span>
+ps -eo pid,lstart,etime,args | grep "node server.js" | grep -v grep
+ss -tlnp | grep 3000</code></pre>
+
+  <p class="paragraph no-indent">对照下表定位问题：</p>
+  <table class="table" data-caption="快速自检结果对照表">
+    <thead>
+      <tr><th style="width:11%">进程</th><th style="width:13%">3000 端口</th><th style="width:38%">结论</th><th style="width:38%">怎么办</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>有</td><td>有</td><td>服务正常，问题在访问链路上</td><td>浏览器按 Ctrl+F5 强制刷新；仍打不开则是端口没放行，去云服务商控制台和宝塔面板放行 3000</td></tr>
+      <tr><td>有</td><td>没有</td><td>进程活着但没监听 3000 —— 多半是跑在了错误端口（旧端口残留进程）</td><td>见第三章 3.5「多余进程清理」</td></tr>
+      <tr><td>没有</td><td>没有</td><td>服务彻底挂了</td><td>看第三章 3.1 判断怎么挂的，再按第四章流程重启</td></tr>
+      <tr><td>有多个</td><td>有</td><td>双进程并存，其中一个是多余的</td><td>见第三章 3.5「多余进程清理」</td></tr>
+    </tbody>
+  </table>
+
+  <!-- ===== 第二章：症状速查表 ===== -->
+  <h1 class="heading">二、症状速查表：按现象找原因</h1>
+  <p class="paragraph">先对号入座，再按指引的章节处理。</p>
+
+  <table class="table" data-caption="常见症状与原因速查">
+    <thead>
+      <tr><th style="width:24%">现象</th><th style="width:34%">大概率原因</th><th style="width:42%">处理办法</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>页面一直转圈打不开（超时）</td><td>3000 端口没放行。注意要放行两个地方：云服务商控制台的「安全组」+ 宝塔面板的「安全」</td><td>两处都放行后，浏览器 Ctrl+F5 强刷再试</td></tr>
+      <tr><td>页面能打开，但消息发不出去 / 收不到</td><td>WebSocket 连接断开，或服务进程异常</td><td>先 Ctrl+F5 强刷；无效则按第一章自检进程，见第三章</td></tr>
+      <tr><td>浏览器控制台报 <code>Unexpected token '&lt;'</code></td><td>接口返回了 HTML 错误页 —— 服务没跑起来，或依赖残缺</td><td>先按第一章自检；服务在跑则按第四章重装依赖</td></tr>
+      <tr><td>浏览器报 <code>Failed to fetch</code></td><td>访问地址写错：比如用了 127.0.0.1 或漏了 http:// 前缀</td><td>改用服务器公网 IP，地址必须以 http:// 开头</td></tr>
+      <tr><td>页面报 500 错误</td><td>数据文件损坏或读写冲突</td><td>按第五章数据部分：停服务再启动，一般即可恢复</td></tr>
+      <tr><td>启动时报 <code>EADDRINUSE</code>（address already in use）</td><td>3000 端口已被其他进程占用</td><td>见第三章 3.5，查出占端口的进程并处理</td></tr>
+      <tr><td>换电脑 / 手机后聊天记录全没了</td><td>不是故障 —— 会话机制认浏览器不认人</td><td>见第五章「会话识别机制」</td></tr>
+    </tbody>
+  </table>
+
+  <!-- ===== 第三章：进程与保活排查 ===== -->
+  <h1 class="heading">三、进程与保活排查（核心）</h1>
+
+  <h2 class="heading">3.1 判断进程断没断过</h2>
+  <p class="paragraph">看进程的「出生时间」就能判断：如果启动时间就是你部署那天的时间，说明从部署起就没断过；如果启动时间是最近的（几分钟前、几小时前），说明中途断过、被保活任务自动拉起来了 —— 断几次，就有几个「较新」的启动时间可查。</p>
+  <pre class="code" data-lang="bash"><code><span class="cmt"># pid 进程号 | lstart 启动时间 | etime 已存活时长</span>
+ps -eo pid,lstart,etime,args | grep "node server.js" | grep -v grep</code></pre>
+  <p class="paragraph no-indent">输出示例（时间就是线索）：</p>
+  <pre class="code" data-lang="text"><code>  PID  STARTED          ELAPSED   COMMAND
+26344  Sun Sep 27 12:12  1-03:20:42  node server.js
+<span class="cmt"># 启动时间 = 9月27日 12:12，已连续存活 1天3小时 → 期间没断过</span></code></pre>
+
+  <h2 class="heading">3.2 查有没有被系统「悄悄杀掉」（内存不足）</h2>
+  <p class="paragraph">服务器内存不够时，系统会直接杀掉最占内存的进程，而且不会有任何界面提示。这是「进程莫名其妙消失」的头号原因。</p>
+  <pre class="code" data-lang="bash"><code>dmesg -T | grep -i -E "oom|kill" | tail -20</code></pre>
+  <p class="paragraph no-indent">如果看到 <code style="background:#1e293b;color:#e2e8f0;padding:1px 7px;border-radius:4px;font-size:12.5px;font-family:Consolas,monospace;">Out of memory: Killed process</code> 字样，说明进程是被系统因内存不足杀掉的，解决办法：升级服务器配置，或增加 swap 交换空间。</p>
+
+  <h2 class="heading">3.3 查服务器自己重启过没</h2>
+  <p class="paragraph">服务器重启后进程自然全没了（有保活的话会自动爬起来）。查一下就知道：</p>
+  <pre class="code" data-lang="bash"><code>last reboot | head -5</code></pre>
+  <p class="paragraph no-indent">如果输出里有近期的重启记录，说明服务中断是服务器重启导致的，不是程序的问题。</p>
+
+  <h2 class="heading">3.4 看运行日志</h2>
+  <p class="paragraph">服务运行的全部输出都记录在项目目录下的 run.log 里，报错信息第一时间看这里。</p>
+  <pre class="code" data-lang="bash"><code>tail -30 run.log   <span class="cmt"># 看最近 30 行</span>
+tail -f run.log    <span class="cmt"># 实时滚动盯着看，Ctrl+C 退出</span></code></pre>
+
+  <h2 class="heading">3.5 多余进程清理（改端口后必查）</h2>
+  <p class="paragraph">正常情况服务器上只应该有<strong>一个</strong> node server.js 进程。如果 ps 查出来有多个，通常是因为改过端口部署：旧端口的进程还活着，新端口的进程又被拉起来了，两个并存。多余的进程不仅白占内存，还会和正式服务<strong>共写同一份数据目录</strong>，有数据错乱风险，必须清理。</p>
+  <aside class="callout" data-variant="tip">
+    <p><strong>判断口诀：谁占着 3000 谁干活，不占 3000 的都是多余的。</strong>放心杀 —— 就算万一杀错，保活任务 1 分钟内会自动拉起，不影响线上。</p>
+  </aside>
+  <pre class="code" data-lang="bash"><code><span class="cmt"># 1. 列出所有 node server.js 进程，记下每个的 PID</span>
+ps -eo pid,lstart,etime,args | grep "node server.js" | grep -v grep
+
+<span class="cmt"># 2. 看谁占着 3000（这个是在干活的，留着）</span>
+ss -tlnp | grep 3000
+
+<span class="cmt"># 3. 查多余进程在监听什么端口、在哪个目录跑（确认身份再动手）</span>
+ss -tlnp | grep 其他PID
+ls -l /proc/其他PID/cwd
+
+<span class="cmt"># 4. 确认它不占 3000 后，杀掉</span>
+kill 其他PID
+
+<span class="cmt"># 5. 验证：进程只剩一个，3000 还在监听</span>
+ps -eo pid,etime,args | grep "node server.js" | grep -v grep
+ss -tlnp | grep 3000</code></pre>
+
+  <div class="card">
+    <h3>真实案例：两个进程并存，端口一新一旧</h3>
+    <p>某服务器上同时查到两个进程：11:48 启动的和 12:12 启动的。逐一排查发现：旧进程（11:48）跑在 <strong>6789</strong> 旧端口上 —— 是改端口部署前留下的残留；新进程（12:12）占着 <strong>3000</strong>，是保活任务拉起的正式服务。</p>
+    <p>处理：kill 掉旧端口进程，只留占 3000 的那个。杀完验证端口和聊天页面正常，问题解决。整个过程服务不中断，因为干活的一直是 3000 上那个。</p>
+  </div>
+
+  <h2 class="heading">3.6 保活任务自检</h2>
+  <p class="paragraph">先确认保活任务已保存生效：</p>
+  <pre class="code" data-lang="bash"><code>crontab -l
+<span class="cmt"># 应能看到这一行（目录、端口按实际）：</span>
+<span class="cmt"># * * * * * /bin/bash -c 'ss -tln | grep -q ":3000 " || (cd /www/wwwroot/h5-kefu-v2 &amp;&amp; PORT=3000 nohup node server.js &gt; run.log 2&gt;&amp;1 &amp;)'</span></code></pre>
+  <p class="paragraph">再做一次极限测试，验证它真的会自动拉起：</p>
+  <pre class="code" data-lang="bash"><code>pkill -f "node server.js"
+sleep 60
+ss -tlnp | grep 3000   <span class="cmt"># 有输出 = 保活正常，60秒内自己爬起来了</span></code></pre>
+  <aside class="callout" data-variant="warning">
+    <p><strong>注意：</strong>pkill 会断掉正在进行的聊天连接，极限测试请在没有客户在线的时段做。</p>
+  </aside>
+
+  <!-- ===== 第四章：依赖与安装问题 ===== -->
+  <h1 class="heading">四、依赖与安装问题</h1>
+
+  <h2 class="heading">4.1 npm install 报错：E404 / 源配错</h2>
+  <p class="paragraph">安装依赖时报 E404，多半是 npm 的下载源被配错成了无效地址（比如曾被设置成 cdn.npmmirror.com 开头的二进制地址，而不是正规的 registry 地址）。查一下当前用的源，改回官方源或国内镜像源即可：</p>
+  <pre class="code" data-lang="bash"><code>npm config get registry                <span class="cmt"># 查看当前源</span>
+npm config set registry https://registry.npmjs.org   <span class="cmt"># 改回官方源</span>
+<span class="cmt"># 国内服务器慢的话用国内镜像：npm config set registry https://registry.npmmirror.com</span></code></pre>
+
+  <h2 class="heading">4.2 依赖残缺的「怪症状」</h2>
+  <p class="paragraph">有一种很迷惑的故障：进程明明跑起来了、端口也在监听，但客服端一登录就报错，浏览器控制台报 <code style="background:#1e293b;color:#e2e8f0;padding:1px 7px;border-radius:4px;font-size:12.5px;font-family:Consolas,monospace;">Unexpected token '&lt;'</code>，run.log 里出现 <code style="background:#1e293b;color:#e2e8f0;padding:1px 7px;border-radius:4px;font-size:12.5px;font-family:Consolas,monospace;">Cannot find module 'xxx'</code> 类字样。</p>
+  <p class="paragraph">这不是代码 bug，是 node_modules 安装中断过、文件不完整导致的。表现就是：服务起得来，接口全废（返回的是 HTML 错误页而不是数据）。</p>
+
+  <h2 class="heading">4.3 标准重装流程（一次搞定）</h2>
+  <pre class="code" data-lang="bash"><code><span class="cmt"># 1. 停掉现有进程</span>
+pkill -f "node server.js"
+
+<span class="cmt"># 2. 进入项目目录</span>
+cd /www/wwwroot/h5-kefu-v2
+
+<span class="cmt"># 3. 删干净残缺的依赖，重装</span>
+rm -rf node_modules
+npm install
+
+<span class="cmt"># 4. 重新启动</span>
+PORT=3000 nohup node server.js &gt; run.log 2&gt;&amp;1 &amp;
+disown -h %1</code></pre>
+  <p class="paragraph">看到 npm install 结尾出现 <code style="background:#1e293b;color:#e2e8f0;padding:1px 7px;border-radius:4px;font-size:12.5px;font-family:Consolas,monospace;">added xx packages</code> 且没有 <code style="background:#1e293b;color:#e2e8f0;padding:1px 7px;border-radius:4px;font-size:12.5px;font-family:Consolas,monospace;">vulnerabilities</code> 以外的红色报错，就算装好了。</p>
+
+  <!-- ===== 第五章：数据与会话机制 ===== -->
+  <h1 class="heading">五、数据与会话机制（客服方常问）</h1>
+
+  <h2 class="heading">5.1 系统怎么认出「同一个客户」？</h2>
+  <div class="faq-item">
+    <p class="q">Q: 是根据 IP 或设备判断的吗？客户换地方还认得出来吗？</p>
+    <p class="a">A: 都不是。系统是在访客<strong>浏览器的本地存储（localStorage）</strong>里存一个随机 ID：客户第一次打开聊天页时自动生成，之后每次打开自动读取。服务端按「客服 ID + 访客 ID」绑定同一个会话。所以同一浏览器打开同一客服的链接，永远接着同一个会话聊，历史记录完整保留。</p>
+  </div>
+  <table class="table" data-caption="什么情况会被当成「新客户」">
+    <thead>
+      <tr><th style="width:58%">场景</th><th style="width:42%">结果</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>同一手机 / 浏览器反复打开聊天页</td><td>同一客户，会话延续，记录完整</td></tr>
+      <tr><td>换手机、换电脑打开</td><td>新客户（新设备上没有那个 ID）</td></tr>
+      <tr><td>清了浏览器缓存 / 微信清理了缓存</td><td>新客户（ID 被清掉）</td></tr>
+      <tr><td>无痕 / 隐私模式打开</td><td>新客户（关闭即丢失）</td></tr>
+      <tr><td>换了另一个客服的聊天链接</td><td>同一访客，但在新客服名下开新会话</td></tr>
+    </tbody>
+  </table>
+  <aside class="callout">
+    <p><strong>给客服的解释话术：</strong>这是免登录系统的通用设计 —— 零门槛（客户不用注册），代价是「认浏览器不认人」。客户反馈「记录没了」，先问一句是否换了设备或清理过缓存。</p>
+  </aside>
+
+  <h2 class="heading">5.2 数据存在哪、怎么备份</h2>
+  <table class="table" data-caption="数据文件位置">
+    <thead>
+      <tr><th style="width:26%">目录</th><th style="width:74%">内容</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>data/</td><td>客服账号 + 全部聊天记录（按会话逐文件落盘，无需数据库）</td></tr>
+      <tr><td>uploads/</td><td>聊天中收发的图片文件</td></tr>
+    </tbody>
+  </table>
+  <pre class="code" data-lang="bash"><code><span class="cmt"># 备份（在服务器上执行，生成压缩包在 /www 下）</span>
+cd /www &amp;&amp; tar czf kefu-backup-$(date +%Y%m%d).tar.gz h5-kefu-v2/data h5-kefu-v2/uploads</code></pre>
+  <p class="paragraph">迁移到新服务器：把整个项目目录拷贝过去，执行一次 npm install 再启动即完成，聊天记录原样带走。</p>
+  <aside class="callout" data-variant="warning">
+    <p><strong>重要：</strong>页面突然集体报 500，多半是数据文件读写冲突 —— 先停服务再重新启动，一般即可恢复。<strong>手工替换或修改 data/ 里的文件前，必须先停掉服务进程</strong>，带服务运行时改数据文件容易写坏。</p>
+  </aside>
+
+  <!-- ===== 第六章：常用命令速查 ===== -->
+  <h1 class="heading">六、常用命令速查表</h1>
+  <table class="table" data-caption="运维命令速查">
+    <thead>
+      <tr><th style="width:16%">用途</th><th style="width:84%">命令</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>看进程</td><td><code>ps -eo pid,lstart,etime,args | grep "node server.js" | grep -v grep</code></td></tr>
+      <tr><td>看端口</td><td><code>ss -tlnp | grep 3000</code></td></tr>
+      <tr><td>启动服务</td><td><code>cd /www/wwwroot/h5-kefu-v2 &amp;&amp; PORT=3000 nohup node server.js &gt; run.log 2&gt;&amp;1 &amp;</code> 然后紧接着执行 <code>disown -h %1</code></td></tr>
+      <tr><td>停止服务</td><td><code>pkill -f "node server.js"</code></td></tr>
+      <tr><td>看日志（最近）</td><td><code>tail -30 run.log</code></td></tr>
+      <tr><td>看日志（实时）</td><td><code>tail -f run.log</code>（Ctrl+C 退出）</td></tr>
+      <tr><td>重装依赖</td><td><code>cd /www/wwwroot/h5-kefu-v2 &amp;&amp; rm -rf node_modules &amp;&amp; npm install</code></td></tr>
+      <tr><td>备份数据</td><td><code>cd /www &amp;&amp; tar czf kefu-backup-$(date +%Y%m%d).tar.gz h5-kefu-v2/data h5-kefu-v2/uploads</code></td></tr>
+      <tr><td>看定时任务</td><td><code>crontab -l</code></td></tr>
+      <tr><td>查内存被杀记录</td><td><code>dmesg -T | grep -i -E "oom|kill" | tail -20</code></td></tr>
+    </tbody>
+  </table>
+
+  <!-- ===== 深挖折叠 ===== -->
+  <h1 class="heading">附录：两个常见「为什么」</h1>
+
+  <details class="deep-dive">
+    <summary>深挖：为什么我明明用了 nohup 启动，关掉 SSH 窗口服务还是挂了？</summary>
+    <div class="content">
+      <p class="paragraph no-indent">部分服务器环境下，单独的 nohup 不够保险：SSH 会话结束时子进程仍可能被一并带走，表现就是「终端一关，服务就没了」。</p>
+      <p class="paragraph no-indent">两个办法，建议都配上：</p>
+      <ul class="list">
+        <li><strong>当下启动用 disown：</strong>执行启动命令后，紧接着输入 <code style="background:#1e293b;color:#e2e8f0;padding:1px 7px;border-radius:4px;font-size:12.5px;font-family:Consolas,monospace;">disown -h %1</code>，之后用 <code style="background:#1e293b;color:#e2e8f0;padding:1px 7px;border-radius:4px;font-size:12.5px;font-family:Consolas,monospace;">exit</code> 命令正常退出 SSH（不要直接点 X 关窗口）。</li>
+        <li><strong>长期兜底用 crontab 保活：</strong>每分钟自动检查端口，进程没了就自动拉起。就算服务器重启、进程意外崩溃，最多 1 分钟自动恢复。这是根治方案，配置方法见部署文档。</li>
+      </ul>
+    </div>
+  </details>
+
+  <details class="deep-dive">
+    <summary>深挖：想换一个端口跑，要改哪些地方？</summary>
+    <div class="content">
+      <p class="paragraph no-indent">换端口有<strong>四处</strong>要同步改，漏一处就出「端口对不上」的怪问题：</p>
+      <ul class="list">
+        <li>启动命令里的 <code style="background:#1e293b;color:#e2e8f0;padding:1px 7px;border-radius:4px;font-size:12.5px;font-family:Consolas,monospace;">PORT=3000</code> 改成新端口；</li>
+        <li>保活 crontab 那一行里的两处端口（检测的端口 + 启动的端口）同步改；</li>
+        <li>云服务商安全组和宝塔面板放行新端口；</li>
+        <li>已经发出去的聊天链接地址全部更新，旧端口的残留进程记得按 3.5 节清理。</li>
+      </ul>
+    </div>
+  </details>
+
+  <!-- ===== 尾页 ===== -->
+  <section class="title end_page">
+    <h1>排查心法</h1>
+    <p>三步走：先自检（第一章 30 秒定位方向）→ 按症状找原因（第二章速查表）→ 按章节深挖处理（第三至五章）。</p>
+    <p>90% 的故障逃不过三样：进程挂了、端口没放行、依赖残缺。</p>
+    <p style="margin-top:12px;">交付前三件事：改掉初始密码 admin123 ｜ 配好 crontab 保活 ｜ 放行端口并验证页面可访问。</p>
+  </section>
+
+</body>
+</html>

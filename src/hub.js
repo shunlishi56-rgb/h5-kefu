@@ -381,6 +381,16 @@ module.exports = {
   isAgentOnline,
   isVisitorOnline,
   broadcastSessionUpdate,
+  /** 会话被删除时通知在线访客（其连接被关闭，重连后自动开新会话） */
+  notifySessionDeleted(sid) {
+    const set = visitorSockets.get(sid);
+    if (!set) return;
+    for (const ws of set) {
+      safeSend(ws, { type: 'session_deleted', sid, ts: Date.now() });
+      try { ws.close(); } catch (e) {}
+    }
+    visitorSockets.delete(sid);
+  },
   /** 扩展点：注册新消息钩子（提醒推送） */
   onNewMessage(hook) { onNewMessageHook = hook; }
 };
